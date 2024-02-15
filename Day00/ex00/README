@@ -1,0 +1,3 @@
+Launch container: `docker-compose up` 
+
+Connect to your posgress database: `docker container exec -it postgres sh -c "psql -U jiglesia -dpiscineds -h localhost -W"`
