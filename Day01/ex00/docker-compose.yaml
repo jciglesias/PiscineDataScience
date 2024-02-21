@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres
+    restart: always
+    container_name: postgres
+    volumes:
+      - pgdb:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=jiglesia
+      - POSTGRES_DB=piscineds
+      - POSTGRES_PASSWORD=mysecretpassword
+    ports:
+      - 5432:5432
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      - PGADMIN_LISTEN_PORT=4243
+      - PGADMIN_DEFAULT_EMAIL=jiglesia@student.42.fr
+      - PGADMIN_DEFAULT_PASSWORD=mysecretpassword
+    ports:
+      - 4243:4243
+
+volumes:
+  pgdb:
+    name: db
