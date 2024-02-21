@@ -1,4 +1,5 @@
 import os, csv, psycopg2, threading
+from tqdm import tqdm
 
 filepath = "/sgoinfre/goinfre/Perso/jiglesia/customer"
 
@@ -23,5 +24,5 @@ if __name__=="__main__":
         threads.append(threading.Thread(target=tables, args=(file,)))
     for t in threads:
         t.start()
-    for th in threads:
+    for th in tqdm(threads, desc="Importing CSV"):
         th.join()
