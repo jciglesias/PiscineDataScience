@@ -4,12 +4,6 @@ if __name__ == "__main__":
     conn = psycopg2.connect(database="piscineds", user='jiglesia', password='mysecretpassword', host='127.0.0.1')
     conn.autocommit = False
     cursor = conn.cursor()
-
-    # cursor.execute('''
-    #                 SELECT customers.*, items.*
-    #                FROM customers
-    #                INNER JOIN items ON customers.product_id = items.product_id;
-    #                ''')
     cursor.execute('''
                     ALTER TABLE customers
                     ADD COLUMN category_id varchar,
