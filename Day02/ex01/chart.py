@@ -6,17 +6,20 @@ if __name__ == "__main__":
     conn.autocommit = False
     cursor = conn.cursor()
 
-    # cursor.execute("SELECT event_time, price, user_id FROM customers WHERE event_type = 'purchase'")
     day = datetime.datetime(2022,10,1)
     count = {}
     while (day < datetime.datetime(2023,3,1)):
-        cursor.execute(f"SELECT user_id FROM customers WHERE event_type = 'purchase' AND event_time = {day.date()}")
-        count[day] = len(cursor.fetchall())
+        cursor.execute(f"""
+                       SELECT user_id, price
+                       FROM customers 
+                       WHERE event_time BETWEEN '{day.date()}' AND '{(day + datetime.timedelta(1)).date()}'
+                       AND event_type = 'purchase'
+                       """)
+        query = cursor.fetchall()
+        count[day] = len(query)
         day += datetime.timedelta(1)
-    data = cursor.fetchall()
     cursor.close()
     conn.close()
     
-    # time, price, user = zip(*data)
     plt.plot(count.keys(), count.values())
     plt.show()
