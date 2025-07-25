@@ -6,17 +6,15 @@ if __name__ == "__main__":
     cursor = conn.cursor()
 
     cursor.execute('''
-                    DELETE FROM customers c1
-                    WHERE EXISTS (
-                        SELECT 1 FROM customers c2
-                        WHERE c2.event_type = c1.event_type
-                        AND c2.product_id = c1.product_id
-                        AND c2.user_id = c1.user_id
-                        AND c2.user_session = c1.user_session
-                        AND c2.price = c1.price
-                        AND ABS(EXTRACT(EPOCH FROM (c2.event_time - c1.event_time))) <= 1
-                        AND c2.event_time < c1.event_time
-                    );
+                    DELETE FROM customers a
+                    USING customers b
+                    WHERE a.ctid > b.ctid
+                    AND a.event_time = b.event_time
+                    AND a.event_type = b.event_type
+                    AND a.product_id = b.product_id
+                    AND a.price = b.price
+                    AND a.user_id = b.user_id
+                    AND a.user_session = b.user_session;
                     ''')
     cursor.close()
     conn.close()
