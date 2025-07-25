@@ -10,7 +10,7 @@ if __name__ == "__main__":
                     ADD COLUMN category_code VARCHAR,
                     ADD COLUMN brand VARCHAR;
                    ''')
-    
+
     cursor.execute('''
                     UPDATE customers AS c
                     SET

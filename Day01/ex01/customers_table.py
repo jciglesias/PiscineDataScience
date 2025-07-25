@@ -5,6 +5,8 @@ if __name__=="__main__":
     conn.autocommit = True
     cursor = conn.cursor()
 
+    cursor.execute('DROP TABLE IF EXISTS customers;')
+
     cursor.execute('''
                     CREATE TABLE customers AS
                     SELECT *

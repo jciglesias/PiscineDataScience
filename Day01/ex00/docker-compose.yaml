@@ -13,6 +13,8 @@ services:
       - POSTGRES_PASSWORD=mysecretpassword
     ports:
       - 5432:5432
+    networks:
+      - default
   pgadmin:
     image: dpage/pgadmin4:latest
     environment:
@@ -21,7 +23,14 @@ services:
       - PGADMIN_DEFAULT_PASSWORD=mysecretpassword
     ports:
       - 4243:4243
+    networks:
+      - default
 
 volumes:
   pgdb:
     name: db
+    driver: local
+
+networks:
+  default:
+    driver: bridge
