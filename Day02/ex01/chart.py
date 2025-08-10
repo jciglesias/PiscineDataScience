@@ -1,74 +1,107 @@
 import psycopg2, datetime
-import matplotlib.pyplot as plt
-from statistics import mean
+import plotly.express as px
+import streamlit as st
+from pandas import DataFrame
 
-if __name__ == "__main__":
-    conn = psycopg2.connect(database="piscineds", user='jiglesia', password='mysecretpassword', host='127.0.0.1')
-    conn.autocommit = False
-    cursor = conn.cursor()
+st.set_page_config(layout="wide")
+conn = psycopg2.connect(database="piscineds", user='jiglesia', password='mysecretpassword', host='127.0.0.1')
+conn.autocommit = False
+cursor = conn.cursor()
 
-    day = datetime.datetime(2022,10,1)
-    data = {}
-    while (day < datetime.datetime(2023,2,1)):
-        cursor.execute(f"""
-                       SELECT user_id, price
-                       FROM customers 
-                       WHERE event_time BETWEEN '{day.date()}' AND '{(day + datetime.timedelta(1)).date()}'
-                       AND event_type = 'purchase'
-                       """)
-        query = cursor.fetchall()
-        data[day] = {"count": len(query), "id": [], "price": []}
-        for x in query:
-            data[day]["id"].append(x[0])
-            data[day]["price"].append(x[1])
-        day += datetime.timedelta(1)
-    cursor.close()
-    conn.close()
-    ax1: plt.Axes
-    ax2: plt.Axes
-    ax3: plt.Axes
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2,2)
-    
-    ax1.plot(data.keys(), [x["count"] for x in data.values()])
-    ax1.set_title('Customers per day')
-    ax1.set_xlabel('Days')
-    ax1.set_ylabel('Number of customers')
-    plt.setp(ax1.get_xticklabels(), rotation=45)
-    
-    t_sales = [[],[],[],[]]
-    for x in data:
-        if x.month == 10:
-            t_sales[0].append(sum(data[x]["price"]))
-        elif x.month == 11:
-            t_sales[1].append(sum(data[x]["price"]))
-        elif x.month == 12:
-            t_sales[2].append(sum(data[x]["price"]))
-        elif x.month == 1:
-            t_sales[3].append(sum(data[x]["price"]))
-    ax2.bar(["oct", "nov", "dec", "jan"], [sum(x) for x in t_sales])
-    ax2.set_title('Income per month')
-    ax2.set_xlabel('Month')
-    ax2.set_ylabel('Income ₳')
+months = {
+    1: 'January',
+    2: 'February',
+    3: 'March',
+    4: 'April',
+    5: 'May',
+    6: 'June',
+    7: 'July',
+    8: 'August',
+    9: 'September',
+    10: 'October',
+    11: 'November',
+    12: 'December'
+}
+def get_customers():
+    cursor.execute("""
+        SELECT DATE(event_time) as day, count(distinct user_id)
+        FROM customers 
+        WHERE event_type = 'purchase'
+        group by day
+		ORDER BY day
+        """)
 
-    avg = {}
-    for x in data:
-        avg[x] = dict.fromkeys(data[x]["id"])
-        for client in avg[x]:
-            avg[x][client] = []
-        for i in range(len(data[x]["id"])):
-            avg[x][data[x]["id"][i]].append(data[x]["price"][i])
-    for x in avg:
-        for client in avg[x]:
-            avg[x][client] = sum(avg[x][client])
-        avg[x] = mean(avg[x].values())
-    ax3.plot(avg.keys(), avg.values(), color='blue')
-    ax3.fill_between(avg.keys(), avg.values(), color='lightblue')
-    ax3.set_title('Average spent per customer per day')
-    ax3.set_xlabel('Days')
-    ax3.set_ylabel('Spent per day')
-    plt.setp(ax3.get_xticklabels(), rotation=45)
+    data = cursor.fetchall()
+    return data
 
-    ax4.axis("off")
+def get_sales():
+    cursor.execute("""
+            SELECT 
+                extract(month from DATE(event_time)) as month,
+                sum(price) as sales
+            FROM customers 
+            WHERE event_type = 'purchase'
+            group by month
+            ORDER BY month
+            """)
 
-    plt.tight_layout()
-    plt.show()
+    data = DataFrame(cursor.fetchall(), columns=['month', 'total sales in million of ₳'])
+    data['month'] = data['month'].apply(lambda x: months[int(x)])
+    return data
+
+def get_spent_per_day():
+    cursor.execute("""
+                with daily_user as(
+                SELECT 
+                    DATE(event_time) as days,
+                    user_id,
+                    sum(price) as spent
+                FROM customers 
+                WHERE event_type = 'purchase'
+                group by days, user_id
+                ORDER BY days
+                )
+                select
+                    days,
+                    avg(spent) as mean_spent
+                from daily_user
+                group by days
+                order by days
+                   """)
+
+    data = cursor.fetchall()
+    return data
+
+c1, c2, c3 = st.columns(3)
+data = DataFrame(get_customers(), columns=['day', 'number of customers'])
+line_fig = px.line(
+    data,
+    x='day',
+    y='number of customers',
+    title='Number of Customers per Day',
+)
+line_fig.update_xaxes(title_text='')
+c1.plotly_chart(line_fig)
+
+bars_fig = px.bar(
+    get_sales(),
+    x='month',
+    y='total sales in million of ₳',
+    title='Monthly Sales'
+)
+bars_fig.update_xaxes(title_text='')
+c2.plotly_chart(bars_fig)
+
+spent_data = DataFrame(get_spent_per_day(), columns=['day', 'average spend/customers in ₳'])
+spent_fig = px.line(
+    spent_data,
+    x='day',
+    y='average spend/customers in ₳',
+    title='Average Spent per Customer per Day'
+)
+spent_fig.update_traces(fill='tozeroy')
+spent_fig.update_xaxes(title_text='')
+c3.plotly_chart(spent_fig)
+
+cursor.close()
+conn.close()
