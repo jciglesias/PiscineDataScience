@@ -1,4 +1,4 @@
-import psycopg2, datetime
+import psycopg2
 import plotly.express as px
 import streamlit as st
 from pandas import DataFrame
