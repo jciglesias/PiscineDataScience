@@ -1,1 +1,1 @@
-cd Day01/ex00 ; docker-compose up -d
+cd Day01/ex00 ; docker compose up -d
