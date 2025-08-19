@@ -1,83 +1,75 @@
-import psycopg2, datetime
-import matplotlib.pyplot as plt
-import statistics as sts
+import streamlit as st
+import plotly.express as px
+import pandas as pd
+import psycopg2
 
-# def meanCart(data: dict):
-#     avg = {}
-#     for x in data:
-#         avg[x] = dict.fromkeys(data[x]["id"])
-#         for client in avg[x]:
-#             avg[x][client] = []
-#         for i in range(len(data[x]["id"])):
-#             if data[x]["event"][i] == "cart":
-#                 avg[x][data[x]["id"][i]].append(data[x]["price"][i])
-#             else:
-#                 avg[x][data[x]["id"][i]].remove(data[x]["price"][i])
+st.set_page_config(page_title="Mustache Store", page_icon=":bar_chart:", layout="wide")
+conn = psycopg2.connect(database="piscineds", user='jiglesia', password='mysecretpassword', host='127.0.0.1')
+conn.autocommit = False
+cursor = conn.cursor()
+def get_stats():
+    query = """
+        SELECT 
+            count(*),
+            avg(price) as mean,
+            stddev_pop(price) as std,
+            percentile_cont(0) within group (order by price) as minimum,
+            percentile_cont(0.25) within group (order by price) as p25,
+            percentile_cont(0.5) within group (order by price) as p50,
+            percentile_cont(0.75) within group (order by price) as p75,
+            percentile_cont(1) within group (order by price) as maximum
+        FROM public.customers
+        where event_type = 'purchase'
+        """
 
+    cursor.execute(query)
+    result = cursor.fetchall()
+    # return result
+    return pd.DataFrame(result, columns=["count", "mean", "std", "minimum", "p25", "p50", "p75", "maximum"])
 
-if __name__ == "__main__":
-    conn = psycopg2.connect(database="piscineds", user='jiglesia', password='mysecretpassword', host='127.0.0.1')
-    conn.autocommit = False
-    cursor = conn.cursor()
-    # cursor.execute(f"""
-    #                 SELECT price
-    #                 FROM customers
-    #                 WHERE event_type = 'purchase'
-    #                 """)
-    # prices = [x[0] for x in cursor.fetchall()]
+@st.cache_data()
+def get_data():
+    query = """
+        SELECT price FROM public.customers
+        where event_type = 'purchase'
+        order by price
+        """
+    cursor.execute(query)
+    result = cursor.fetchall()
+    return pd.DataFrame(result, columns=["price"])
+
+@st.cache_data()
+def get_avg_basket():
+    query = """
+        with daily_user as(
+        SELECT 
+            DATE(event_time) as days,
+            user_id,
+            sum(price) as spent
+        FROM customers 
+        WHERE event_type = 'cart'
+        group by days, user_id
+        ORDER BY days
+        )
+        select
+            user_id,
+            avg(spent) as avg_basket
+        from daily_user
+        group by user_id
+        order by avg_basket 
+        """
     
-    # day = datetime.datetime(2022,10,1)
-    data = {}
-    # while (day < datetime.datetime(2023,2,1)):
-        # cursor.execute(f"""
-        #                SELECT user_id, price, event_type, product_id
-        #                FROM customers 
-        #                WHERE event_time BETWEEN '{day.date()}' AND '{(day + datetime.timedelta(1)).date()}'
-        #                AND (event_type = 'cart' OR event_type = 'remove_from_cart')
-        #                """)
-    cursor.execute(f"""
-                   SELECT user_id, price
-                   FROM customers 
-                   WHERE event_type = 'purchase'
-                   """)
-    query = cursor.fetchall()
-    # data[day] = {}
-    for x in query:
-        if x[0] not in data:
-            data[x[0]] = []
-        # if x[2] == "cart":
-        data[x[0]].append(x[1])
-            # elif x[2] == "remove_from_cart":
-            #     try:
-            #         data[day][x[0]].remove(x[1])
-            #     except:
-            #         pass
-        # day += datetime.timedelta(1)
+    cursor.execute(query)
+    result = cursor.fetchall()
+    return pd.DataFrame(result, columns=["user_id", "avg_basket"])
 
-    # cursor.close()
-    # conn.close()
-    # print(f"count\t{len(prices)}")
-    # print(f"mean\t{sts.mean(prices)}")
-    # print(f"median\t{sts.median(prices)}")
-    # print(f"std\t{sts.pstdev(prices)}")
-    # print(f"min\t{min(prices)}")
-    # prices.sort()
-    # print(f"25%\t{prices[int(len(prices)*0.25)]}")
-    # print(f"50%\t{prices[int(len(prices)*0.5)]}")
-    # print(f"75%\t{prices[int(len(prices)*0.75)]}")
-    # print(f"max\t{max(prices)}")
+stats = get_stats()
+st.dataframe(stats, hide_index=True)
 
-    ax1: plt.Axes
-    ax2: plt.Axes
-    ax3: plt.Axes
-    fig, ((ax1), (ax2), (ax3)) = plt.subplots(3,1)
-    # ax1.boxplot(prices, vert=False, widths=0.8)
-    # ax2.boxplot(prices, vert=False, widths=0.8, showfliers=False, patch_artist=True, boxprops=dict(facecolor="lightgreen", color="green"))
-    cart_price = []
-    for x in data:
-        # for y in data[x]:
-        cart_price.append(sum(data[x]))
-    ax3.boxplot([x for x in cart_price if x != 0], vert=False, widths=0.8)
-    plt.tight_layout()
-    plt.show()
+data = get_data()
+box_fig = px.box(data, x="price", title="Box Plot of Prices")
+st.plotly_chart(box_fig, use_container_width=True)
 
+basket_data = get_avg_basket()
+basket_fig = px.box(basket_data, x="avg_basket", title="Average Basket per User")
+st.plotly_chart(basket_fig, use_container_width=True)
